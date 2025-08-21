@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Конфигурация
 API_TOKEN = "6288342219:AAELGG0RjPjppMvuCS7xdPgW4F4w7Eq-5ls"
-FEED_CHANNEL_ID = -4973517176
+FEED_CHANNEL_ID = -1001552937015
 
 # Инициализация бота с правильными параметрами
 bot = Bot(
