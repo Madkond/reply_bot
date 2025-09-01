@@ -6,11 +6,10 @@ from dotenv import load_dotenv
 from typing import Optional
 
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, ChatMemberUpdated
+from aiogram.types import Message, ChatMemberUpdated, InputMediaPhoto, InputMediaVideo
 from aiogram.filters import CommandStart
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-
 
 # -------- Настройка --------
 load_dotenv()
@@ -30,6 +29,10 @@ BOUND_CHAT_ID: Optional[int] = None
 
 # Время старта процесса (для отсечения старых апдейтов)
 startup_ts = int(time.time())
+
+# --- Буфер для альбомов ---
+album_buffer = {}   # key: (chat_id, media_group_id) -> list[Message]
+album_tasks = {}    # key -> asyncio.Task
 
 
 # -------- /start --------
@@ -83,14 +86,52 @@ async def ignore_start(message: Message):
         pass
 
 
-# -------- Формируем подпись с @username --------
+# -------- Формируем подпись с @username или ФИО/телефоном --------
 def format_caption(message: Message) -> str:
     user = message.from_user
     if not user:
         return "👤 Unknown"
-    username = f"@{user.username}" if user.username else user.full_name
+
+    if user.username:
+        username = f"@{user.username}"
+    else:
+        username = user.full_name or "Без имени"
+        if user.phone_number:
+            username += f" ({user.phone_number})"
+
     text = message.text or message.caption or ""
     return f"{username},\n{text}".strip()
+
+
+# -------- Сборка альбома --------
+async def flush_album(chat_id, media_group_id):
+    key = (chat_id, media_group_id)
+    messages = album_buffer.pop(key, [])
+    album_tasks.pop(key, None)
+
+    if not messages:
+        return
+
+    # сортируем по ID (правильный порядок)
+    messages.sort(key=lambda m: m.message_id)
+
+    caption = format_caption(messages[0])
+    media = []
+
+    for idx, msg in enumerate(messages):
+        if msg.photo:
+            media.append(InputMediaPhoto(
+                media=msg.photo[-1].file_id,
+                caption=caption if idx == 0 else None
+            ))
+        elif msg.video:
+            media.append(InputMediaVideo(
+                media=msg.video.file_id,
+                caption=caption if idx == 0 else None
+            ))
+
+    if media:
+        await bot.send_media_group(BOUND_CHAT_ID, media=media)
 
 
 # -------- Пересылка обычных сообщений --------
@@ -107,12 +148,24 @@ async def forward_message(message: Message):
         return
     if int(message.date.timestamp()) < startup_ts:
         return
-    # если это бизнес-сообщение — не обрабатываем здесь
     if getattr(message, "business_connection_id", None):
         return
     if message.chat and message.chat.id == BOUND_CHAT_ID:
         return
-    if (message.from_user and (message.from_user.id == OWNER_ID or message.from_user.is_bot)):
+    if message.from_user and (message.from_user.id == OWNER_ID or message.from_user.is_bot):
+        return
+
+    # --- обработка альбомов ---
+    if message.media_group_id:
+        key = (message.chat.id, message.media_group_id)
+        album_buffer.setdefault(key, []).append(message)
+
+        # если таймер ещё не запущен — запускаем
+        if key not in album_tasks:
+            async def delayed_flush(k):
+                await asyncio.sleep(2)
+                await flush_album(*k)
+            album_tasks[key] = asyncio.create_task(delayed_flush(key))
         return
 
     try:
@@ -186,7 +239,6 @@ async def forward_business_message(message: Message):
 
     except Exception as e:
         logging.error(f"Ошибка пересылки business_message: {e}")
-
 
 
 # -------- Старт --------
