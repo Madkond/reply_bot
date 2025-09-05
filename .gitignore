@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+
+# Venv
+venv/
+ENV/
+env/
+.venv/
+
+# Настройки IDE/редакторов
+.idea/
+.vscode/
+*.swp
+
+# Файлы окружения
+.env
+
+# Логи
+*.log
+
+# Системные
+.DS_Store
+Thumbs.db

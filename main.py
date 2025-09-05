@@ -1,4 +1,3 @@
-import logging
 import os
 import asyncio
 import time
@@ -14,8 +13,6 @@ from aiogram.client.default import DefaultBotProperties
 # -------- Настройка --------
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-logging.basicConfig(level=logging.INFO)
 
 bot = Bot(
     token=BOT_TOKEN,
@@ -96,7 +93,7 @@ def format_caption(message: Message) -> str:
         username = f"@{user.username}"
     else:
         username = user.full_name or "Без имени"
-        if user.phone_number:
+        if hasattr(user, "phone_number") and user.phone_number:
             username += f" ({user.phone_number})"
 
     text = message.text or message.caption or ""
@@ -139,10 +136,6 @@ async def flush_album(chat_id, media_group_id):
 async def forward_message(message: Message):
     global OWNER_ID, BOUND_CHAT_ID
 
-    logging.info(f"[forward_message] id={message.message_id}, "
-                 f"business={getattr(message, 'business_connection_id', None)}, "
-                 f"chat={message.chat.id}")
-
     # --- Защиты от дублей/циклов ---
     if not BOUND_CHAT_ID:
         return
@@ -178,8 +171,8 @@ async def forward_message(message: Message):
                 BOUND_CHAT_ID,
                 caption=caption if (message.caption or message.text) else None
             )
-    except Exception as e:
-        logging.error(f"Ошибка пересылки: {e}")
+    except Exception:
+        pass
 
 
 # --- Хранилище обработанных бизнес-сообщений ---
@@ -198,11 +191,8 @@ async def forward_business_message(message: Message):
 
     # --- Анти-дубль ---
     if key in processed_business_msgs:
-        logging.info(f"[skip duplicate business_message] id={message.message_id}, business={business_id}")
         return
     processed_business_msgs.add(key)
-
-    logging.info(f"[forward_business_message] id={message.message_id}, business={business_id}, chat={message.chat.id}")
 
     if not BOUND_CHAT_ID:
         return
@@ -237,8 +227,8 @@ async def forward_business_message(message: Message):
         else:
             await bot.send_message(BOUND_CHAT_ID, caption)
 
-    except Exception as e:
-        logging.error(f"Ошибка пересылки business_message: {e}")
+    except Exception:
+        pass
 
 
 # -------- Старт --------
