@@ -51,7 +51,7 @@ nano ~/apps/mybot/.env
 
 Надо получить токен `@BotFather` в телеграмм :
 
-<img src="Pasted image 20250905144859.png" width="50%" />
+<img src="[Pasted image 20250905144859.png](https://drive.google.com/file/d/1Vz3pG9ZjhqB3tZnnnmzjGI2S02ujNJgB/view?usp=sharing)" width="50%" />
 
 <img src="Pasted image 20250905144909.png" width="50%" />
 
